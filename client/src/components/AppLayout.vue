@@ -56,6 +56,7 @@ const navItems = computed(() => {
     { path: '/chat', icon: '💬', label: '聊天' },
     { path: '/contacts', icon: '👥', label: '联系人' },
     { path: '/moments', icon: '🌐', label: '朋友圈' },
+    { path: '/public-accounts', icon: '📮', label: '公众号' },
     { path: '/feedback', icon: '📝', label: '反馈' },
     { path: '/profile', icon: '👤', label: '个人' }
   ];

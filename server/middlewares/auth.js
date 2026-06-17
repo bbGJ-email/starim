@@ -7,17 +7,13 @@ const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    console.log('auth middleware - token:', token ? 'exists' : 'missing');
-
     if (!token) {
       return res.status(401).json({ ok: false, msg: '未提供认证令牌' });
     }
 
     const decoded = jwt.verify(token, config.jwt.secret);
-    console.log('auth middleware - decoded:', decoded);
 
     const user = await User.findById(decoded.id);
-    console.log('auth middleware - user:', user ? 'found' : 'not found');
 
     if (!user) {
       return res.status(401).json({ ok: false, msg: '用户不存在' });
@@ -27,8 +23,18 @@ const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ ok: false, msg: '账号已被封禁' });
     }
 
+    if ((decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
+      return res.status(401).json({ ok: false, msg: '登录状态已失效，请重新登录' });
+    }
+
+    if (user.passwordUpdatedAt && decoded.iat) {
+      const passwordUpdatedAt = Math.floor(new Date(user.passwordUpdatedAt).getTime() / 1000);
+      if (decoded.iat < passwordUpdatedAt) {
+        return res.status(401).json({ ok: false, msg: '登录状态已失效，请重新登录' });
+      }
+    }
+
     req.user = user;
-    console.log('auth middleware - req.user set:', req.user.id);
     next();
   } catch (error) {
     console.error('auth middleware error:', error.message);
@@ -51,7 +57,7 @@ const requireAdmin = (req, res, next) => {
 
 const generateToken = (user) => {
   return jwt.sign(
-    { id: user.id, username: user.username },
+    { id: user.id, username: user.username, tokenVersion: user.tokenVersion || 0 },
     config.jwt.secret,
     { expiresIn: config.jwt.expiresIn }
   );

@@ -6,6 +6,16 @@ const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3004,http://1
   .map(origin => origin.trim())
   .filter(Boolean);
 
+const uploadAllowedMimeTypes = (process.env.UPLOAD_ALLOWED_MIME_TYPES || 'image/jpeg,image/jpg,image/png,image/gif')
+  .split(',')
+  .map(type => type.trim())
+  .filter(Boolean);
+
+const uploadAllowedExtensions = (process.env.UPLOAD_ALLOWED_EXTENSIONS || '.jpg,.jpeg,.png,.gif')
+  .split(',')
+  .map(ext => ext.trim().toLowerCase())
+  .filter(Boolean);
+
 const requiredEnv = ['JWT_SECRET', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
@@ -36,8 +46,43 @@ module.exports = {
   // 上传文件配置
   upload: {
     dir: process.env.UPLOAD_DIR || 'uploads',
-    maxFileSize: 5 * 1024 * 1024, // 5MB
-    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif']
+    maxFileSize: Number(process.env.UPLOAD_MAX_FILE_SIZE || 5 * 1024 * 1024),
+    allowedTypes: uploadAllowedMimeTypes,
+    allowedExtensions: uploadAllowedExtensions,
+    enableClamAV: process.env.UPLOAD_ENABLE_CLAMAV === 'true',
+    clamAV: {
+      host: process.env.CLAMAV_HOST || '127.0.0.1',
+      port: Number(process.env.CLAMAV_PORT || 3310)
+    }
+  },
+
+  security: {
+    messageRecallWindowSeconds: Number(process.env.MESSAGE_RECALL_WINDOW_SECONDS || 120)
+  },
+
+  // 实名认证配置
+  identityAuth: {
+    url: process.env.IDENTITY_AUTH_URL || ''
+  },
+
+  // SMTP邮件配置
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 465),
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || ''
+  },
+
+  // 邮箱验证码配置
+  emailCode: {
+    expiresMinutes: Number(process.env.EMAIL_CODE_EXPIRES_MINUTES || 10),
+    cooldownSeconds: Number(process.env.EMAIL_CODE_COOLDOWN_SECONDS || 60)
+  },
+
+  // 消息配置
+  message: {
+    recallWindowSeconds: Number(process.env.MESSAGE_RECALL_WINDOW_SECONDS || 120)
   },
 
   // Socket配置

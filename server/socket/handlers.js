@@ -48,6 +48,19 @@ function initSocketHandlers(io) {
           return;
         }
 
+        if ((decoded.tokenVersion || 0) !== (user.tokenVersion || 0)) {
+          socket.emit('authenticated', { ok: false, msg: '登录状态已失效，请重新登录' });
+          return;
+        }
+
+        if (user.passwordUpdatedAt && decoded.iat) {
+          const passwordUpdatedAt = Math.floor(new Date(user.passwordUpdatedAt).getTime() / 1000);
+          if (decoded.iat < passwordUpdatedAt) {
+            socket.emit('authenticated', { ok: false, msg: '登录状态已失效，请重新登录' });
+            return;
+          }
+        }
+
         // 记录socket与用户的映射
         socketUserMap.set(socket.id, userId);
         if (!userSocketMap.has(userId)) {

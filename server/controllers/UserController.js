@@ -1,6 +1,29 @@
 const User = require('../models/User');
+const EmailVerificationCode = require('../models/EmailVerificationCode');
 const { pool } = require('../models/db');
 const { getLastSeen, isUserOnline } = require('../utils/onlineUsers');
+const { getClientIP, recordRiskEvent } = require('../middlewares/ipBan');
+const { sendEmailCode } = require('../utils/email');
+const config = require('../config/app');
+
+function maskRealName(name) {
+  if (!name) return '';
+  if (name.length <= 1) return '*';
+  return `${name[0]}${'*'.repeat(name.length - 1)}`;
+}
+
+function maskIdCard(idcard) {
+  if (!idcard || idcard.length < 8) return '';
+  return `${idcard.slice(0, 3)}***********${idcard.slice(-4)}`;
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
 
 class UserController {
   static async getStatus(req, res) {
@@ -222,6 +245,137 @@ class UserController {
       });
     } catch (error) {
       res.json({ ok: false, msg: '获取邀请统计失败', error: error.message });
+    }
+  }
+
+  static async getRealNameStatus(req, res) {
+    try {
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.json({ ok: false, msg: '用户不存在' });
+      }
+
+      res.json({
+        ok: true,
+        data: {
+          status: user.realNameStatus || 'unverified',
+          realNameMasked: user.realNameMasked || '',
+          idCardMasked: user.idCardMasked || '',
+          gender: user.realNameGender || '',
+          birthday: user.realNameBirthday || '',
+          region: user.realNameRegion || ''
+        }
+      });
+    } catch (error) {
+      res.json({ ok: false, msg: '获取实名认证状态失败', error: error.message });
+    }
+  }
+
+  static async submitRealName(req, res) {
+    try {
+      const name = String(req.body?.name || '').trim();
+      const idcard = String(req.body?.idcard || req.body?.idCard || '').trim();
+
+      if (!name || !idcard) {
+        return res.json({ ok: false, msg: '姓名和身份证号不能为空' });
+      }
+      if (!/^.{2,30}$/.test(name) || !/^\d{17}[\dXx]$/.test(idcard)) {
+        return res.json({ ok: false, msg: '姓名或身份证号格式不正确' });
+      }
+      if (!config.identityAuth.url) {
+        return res.json({ ok: false, msg: '实名认证服务暂不可用' });
+      }
+
+      const response = await fetch(config.identityAuth.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, idcard })
+      });
+      const result = await response.json();
+
+      if (result.showapi_res_code !== 0) {
+        return res.json({ ok: false, msg: result.showapi_res_error || '实名认证服务调用失败' });
+      }
+
+      const body = result.showapi_res_body || {};
+      if (body.code !== 0) {
+        return res.json({ ok: false, msg: body.msg || '姓名与身份证号不匹配' });
+      }
+
+      const region = [body.province, body.city, body.county].filter(Boolean).join(' ');
+      const success = await User.updateRealName(req.user.id, {
+        status: 'verified',
+        realNameMasked: maskRealName(name),
+        idCardMasked: maskIdCard(idcard),
+        gender: body.sex || '',
+        birthday: body.birthday || '',
+        region
+      });
+
+      if (!success) {
+        return res.json({ ok: false, msg: '保存实名认证状态失败' });
+      }
+
+      res.json({
+        ok: true,
+        msg: '实名认证成功',
+        data: {
+          status: 'verified',
+          realNameMasked: maskRealName(name),
+          idCardMasked: maskIdCard(idcard),
+          gender: body.sex || '',
+          birthday: body.birthday || '',
+          region
+        }
+      });
+    } catch (error) {
+      res.json({ ok: false, msg: '实名认证失败，请稍后再试', error: error.message });
+    }
+  }
+
+  static async sendBindEmailCode(req, res) {
+    try {
+      const email = normalizeEmail(req.body?.email);
+      if (!isValidEmail(email)) {
+        recordRiskEvent(getClientIP(req), 'captcha_abuse', { reason: '验证码滥用过多' });
+        return res.json({ ok: false, msg: '邮箱格式不正确' });
+      }
+
+      const coolingDown = await EmailVerificationCode.isCoolingDown(email, 'bind_email', req.user.id);
+      if (coolingDown) {
+        recordRiskEvent(getClientIP(req), 'captcha_abuse', { reason: '验证码滥用过多' });
+        return res.json({ ok: false, msg: '验证码发送过于频繁，请稍后再试' });
+      }
+
+      const code = EmailVerificationCode.generateCode();
+      await EmailVerificationCode.create(email, 'bind_email', code, getClientIP(req), req.user.id);
+      await sendEmailCode(email, code, 'bind_email');
+
+      res.json({ ok: true, msg: '验证码已发送' });
+    } catch (error) {
+      res.json({ ok: false, msg: '发送验证码失败', error: error.message });
+    }
+  }
+
+  static async confirmBindEmail(req, res) {
+    try {
+      const email = normalizeEmail(req.body?.email);
+      const code = String(req.body?.code || '').trim();
+      if (!isValidEmail(email) || !code) {
+        recordRiskEvent(getClientIP(req), 'captcha_abuse', { reason: '验证码滥用过多' });
+        return res.json({ ok: false, msg: '邮箱或验证码不正确' });
+      }
+
+      const result = await EmailVerificationCode.verify(email, 'bind_email', code, req.user.id);
+      if (!result.ok) {
+        recordRiskEvent(getClientIP(req), 'captcha_abuse', { reason: '验证码滥用过多' });
+        return res.json(result);
+      }
+
+      const success = await User.bindEmail(req.user.id, email);
+      res.json({ ok: success, msg: success ? '邮箱绑定成功' : '邮箱绑定失败' });
+    } catch (error) {
+      res.json({ ok: false, msg: '绑定邮箱失败', error: error.message });
     }
   }
 

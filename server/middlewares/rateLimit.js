@@ -2,6 +2,7 @@ const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config/app');
+const { getClientIP, recordRiskEvent } = require('./ipBan');
 
 let rateLimitConfig;
 try {
@@ -20,8 +21,12 @@ const createRateLimiter = (options = {}) => {
     standardHeaders: true,
     legacyHeaders: false,
     skip: (req) => {
-      const ip = req.ip || req.connection.remoteAddress;
+      const ip = getClientIP(req);
       return rateLimitConfig.ignoredIps && rateLimitConfig.ignoredIps.includes(ip);
+    },
+    handler: (req, res, next, opts) => {
+      recordRiskEvent(getClientIP(req), 'rate_limit', { reason: '限流触发过多' });
+      res.status(opts.statusCode).json(opts.message);
     }
   };
 
@@ -45,9 +50,23 @@ const uploadLimiter = createRateLimiter({
   message: { ok: false, msg: '上传次数过多，请1小时后再试' }
 });
 
+const identityLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { ok: false, msg: '实名认证尝试次数过多，请稍后再试' }
+});
+
+const emailCodeLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { ok: false, msg: '验证码请求过于频繁，请稍后再试' }
+});
+
 module.exports = {
   createRateLimiter,
   apiLimiter,
   authLimiter,
-  uploadLimiter
+  uploadLimiter,
+  identityLimiter,
+  emailCodeLimiter
 };

@@ -33,19 +33,25 @@ const LEXICON_FILES = [
 
 // 初始化敏感词工具
 let sensitiveWordTool = null;
+let sensitiveWordToolInitialized = false;
 
 /**
  * 从文件加载敏感词
  */
 function loadWordsFromFile(filePath) {
   try {
+    if (!fs.existsSync(filePath)) {
+      console.warn(`词库文件不存在，已跳过: ${filePath}`);
+      return [];
+    }
+
     const content = fs.readFileSync(filePath, 'utf-8');
-    const words = content.split('\n')
+    const words = content.split(/\r?\n/)
       .map(word => word.trim())
-      .filter(word => word.length > 0);
+      .filter(word => word.length > 0 && !word.startsWith('#'));
     return words;
   } catch (error) {
-    console.error(`加载词库失败 ${filePath}:`, error);
+    console.error(`加载词库失败 ${filePath}:`, error.message);
     return [];
   }
 }
@@ -54,6 +60,11 @@ function loadWordsFromFile(filePath) {
  * 初始化敏感词过滤工具
  */
 function initSensitiveWordTool() {
+  if (sensitiveWordToolInitialized) {
+    return sensitiveWordTool;
+  }
+
+  sensitiveWordToolInitialized = true;
   console.log('正在加载敏感词库...');
   
   let allWords = [];
@@ -65,16 +76,24 @@ function initSensitiveWordTool() {
     console.log(`  加载 ${file}: ${words.length} 个词`);
   }
   
-  // 去重
   const uniqueWords = Array.from(new Set(allWords));
   
-  // 初始化敏感词工具
-  sensitiveWordTool = new SensitiveWordTool({
-    wordList: uniqueWords,
-    useDefaultWords: false
-  });
-  
-  console.log(`敏感词库加载完成，共 ${uniqueWords.length} 个敏感词`);
+  try {
+    sensitiveWordTool = new SensitiveWordTool({
+      wordList: uniqueWords,
+      useDefaultWords: false
+    });
+    console.log(`敏感词库加载完成，共 ${uniqueWords.length} 个敏感词`);
+  } catch (error) {
+    sensitiveWordTool = null;
+    console.error('初始化敏感词工具失败:', error.message);
+  }
+
+  return sensitiveWordTool;
+}
+
+function getSensitiveWordTool() {
+  return sensitiveWordTool || initSensitiveWordTool();
 }
 
 /**
@@ -85,14 +104,13 @@ function initSensitiveWordTool() {
 async function filterSensitiveWords(content) {
   if (!content) return content;
 
-  if (!sensitiveWordTool) {
-    initSensitiveWordTool();
-  }
+  const tool = getSensitiveWordTool();
+  if (!tool) return content;
 
   try {
-    return sensitiveWordTool.filter(content);
+    return tool.filter(String(content));
   } catch (error) {
-    console.error('过滤敏感词失败:', error);
+    console.error('过滤敏感词失败:', error.message);
     return content;
   }
 }
@@ -105,14 +123,13 @@ async function filterSensitiveWords(content) {
 function hasSensitiveWords(content) {
   if (!content) return false;
 
-  if (!sensitiveWordTool) {
-    initSensitiveWordTool();
-  }
+  const tool = getSensitiveWordTool();
+  if (!tool) return false;
 
   try {
-    return sensitiveWordTool.verify(content);
+    return tool.verify(String(content));
   } catch (error) {
-    console.error('检测敏感词失败:', error);
+    console.error('检测敏感词失败:', error.message);
     return false;
   }
 }
@@ -125,14 +142,13 @@ function hasSensitiveWords(content) {
 function findSensitiveWords(content) {
   if (!content) return [];
 
-  if (!sensitiveWordTool) {
-    initSensitiveWordTool();
-  }
+  const tool = getSensitiveWordTool();
+  if (!tool) return [];
 
   try {
-    return sensitiveWordTool.match(content);
+    return tool.match(String(content));
   } catch (error) {
-    console.error('查找敏感词失败:', error);
+    console.error('查找敏感词失败:', error.message);
     return [];
   }
 }

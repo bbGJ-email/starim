@@ -29,6 +29,19 @@ class User {
   }
 
   /**
+   * 根据邮箱获取用户
+   */
+  static async findByEmail(email) {
+    try {
+      const [rows] = await pool.execute('SELECT * FROM st_users WHERE email = ? AND emailVerified = true LIMIT 1', [email]);
+      return rows[0] || null;
+    } catch (error) {
+      console.error('查询邮箱用户失败:', error);
+      return null;
+    }
+  }
+
+  /**
    * 创建新用户
    */
   static async create(userData) {
@@ -100,14 +113,50 @@ class User {
    */
   static async updatePassword(userId, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     try {
       await pool.execute(
-        'UPDATE st_users SET password = ?, updatedAt = ? WHERE id = ?',
-        [hashedPassword, new Date().toISOString().slice(0, 19).replace('T', ' '), userId]
+        'UPDATE st_users SET password = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1, passwordUpdatedAt = ?, updatedAt = ? WHERE id = ?',
+        [hashedPassword, now, now, userId]
       );
       return true;
     } catch (error) {
       console.error('更新密码失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 更新实名认证信息
+   */
+  static async updateRealName(userId, data) {
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    try {
+      await pool.execute(
+        `UPDATE st_users SET realNameStatus = ?, realNameMasked = ?, idCardMasked = ?,
+         realNameGender = ?, realNameBirthday = ?, realNameRegion = ?, updatedAt = ? WHERE id = ?`,
+        [data.status, data.realNameMasked, data.idCardMasked, data.gender, data.birthday, data.region, now, userId]
+      );
+      return true;
+    } catch (error) {
+      console.error('更新实名认证失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 绑定邮箱
+   */
+  static async bindEmail(userId, email) {
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    try {
+      await pool.execute(
+        'UPDATE st_users SET email = ?, emailVerified = true, updatedAt = ? WHERE id = ?',
+        [email, now, userId]
+      );
+      return true;
+    } catch (error) {
+      console.error('绑定邮箱失败:', error);
       return false;
     }
   }

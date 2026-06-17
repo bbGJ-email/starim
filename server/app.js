@@ -62,6 +62,7 @@ app.use(express.static(path.join(__dirname, '..')));
 
 // IP封禁检查（在API路由之前）
 app.use('/api', checkBannedIP);
+app.use('/api', apiLimiter);
 
 // ==================== 路由配置 ====================
 

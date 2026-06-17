@@ -1,3 +1,4 @@
+const config = require('../config/app');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Group = require('../models/Group');
@@ -137,11 +138,11 @@ class MessageController {
         return res.json({ ok: false, msg: '只能撤回自己的消息' });
       }
 
-      // 检查是否在2分钟内
       const msgTime = new Date(message.timestamp).getTime();
       const now = Date.now();
-      if (now - msgTime > 2 * 60 * 1000) {
-        return res.json({ ok: false, msg: '只能撤回2分钟内的消息' });
+      const recallWindowMs = config.security.messageRecallWindowSeconds * 1000;
+      if (now - msgTime > recallWindowMs) {
+        return res.json({ ok: false, msg: `只能撤回${config.security.messageRecallWindowSeconds}秒内的消息` });
       }
 
       const success = await Message.recall(messageId);

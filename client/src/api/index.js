@@ -2,7 +2,9 @@ import request from './request';
 
 export const authApi = {
   register: (data) => request.post('/register', data),
-  login: (data) => request.post('/login', data)
+  login: (data) => request.post('/login', data),
+  sendResetPasswordCode: (email) => request.post('/password/send-reset-code', { email }),
+  resetPassword: (data) => request.post('/password/reset', data)
 };
 
 export const userApi = {
@@ -15,7 +17,19 @@ export const userApi = {
   delete: (password) => request.post('/user/delete', { password }),
   getSelf: () => request.post('/user/self'),
   getReferralStats: () => request.post('/user/referral-stats'),
+  getRealNameStatus: () => request.post('/user/real-name/status'),
+  submitRealName: (data) => request.post('/user/real-name/submit', data),
+  sendBindEmailCode: (email) => request.post('/user/email/send-bind-code', { email }),
+  confirmBindEmail: (data) => request.post('/user/email/confirm-bind', data),
   getStats: () => request.post('/user/stats')
+};
+
+export const publicAccountApi = {
+  getList: () => request.post('/public-account/list'),
+  register: (data) => request.post('/public-account/register', data),
+  getDetail: (id) => request.post('/public-account/detail', { id }),
+  subscribe: (id) => request.post('/public-account/subscribe', { id }),
+  unsubscribe: (id) => request.post('/public-account/unsubscribe', { id })
 };
 
 export const messageApi = {

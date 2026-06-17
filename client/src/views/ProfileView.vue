@@ -20,6 +20,15 @@
       </div>
       
       <div class="profile-content">
+        <div v-if="realNameStatus.status !== 'verified'" class="security-notice">
+          <span class="notice-icon">🌾</span>
+          <div>
+            <strong>建议完成实名认证</strong>
+            <p>认证不会阻断基础使用，可提升账号安全和可信度。</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" @click="showRealName = true">去认证</button>
+        </div>
+
         <div class="section">
           <h3 class="section-title">基本信息</h3>
           <div class="info-list">
@@ -33,7 +42,19 @@
             </div>
             <div class="info-item">
               <span class="info-label">邮箱</span>
-              <span class="info-value">{{ user.email || '-' }}</span>
+              <span class="info-value">
+                {{ user.emailVerified ? user.email : '未绑定' }}
+                <span v-if="user.emailVerified" class="badge badge-success">已验证</span>
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">实名认证</span>
+              <span class="info-value">
+                {{ realNameStatus.status === 'verified' ? '已认证' : '未认证' }}
+                <span :class="['badge', realNameStatus.status === 'verified' ? 'badge-success' : 'badge-warning']">
+                  {{ realNameStatus.status === 'verified' ? realNameStatus.realNameMasked : '建议认证' }}
+                </span>
+              </span>
             </div>
             <div class="info-item">
               <span class="info-label">手机号</span>
@@ -81,6 +102,16 @@
             <button class="settings-item" @click="showEditProfile = true">
               <span class="settings-icon">👤</span>
               <span class="settings-text">编辑资料</span>
+              <span class="settings-arrow">›</span>
+            </button>
+            <button class="settings-item" @click="showRealName = true">
+              <span class="settings-icon">🪪</span>
+              <span class="settings-text">实名认证</span>
+              <span class="settings-arrow">›</span>
+            </button>
+            <button class="settings-item" @click="showBindEmail = true">
+              <span class="settings-icon">✉️</span>
+              <span class="settings-text">绑定邮箱</span>
               <span class="settings-arrow">›</span>
             </button>
             <button class="settings-item" @click="changePassword">
@@ -182,6 +213,66 @@
       </div>
     </div>
     
+    <!-- 实名认证弹窗 -->
+    <div v-if="showRealName" class="modal-overlay" @click.self="showRealName = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>实名认证</h3>
+          <button class="close-btn" @click="showRealName = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="realNameStatus.status === 'verified'" class="verified-card">
+            <strong>已完成实名认证</strong>
+            <p>{{ realNameStatus.realNameMasked }} · {{ realNameStatus.idCardMasked }}</p>
+            <p v-if="realNameStatus.region">{{ realNameStatus.region }}</p>
+          </div>
+          <template v-else>
+            <p class="form-tip">仅用于身份证二要素认证，前端不保存身份证测试数据。</p>
+            <div class="form-group">
+              <label>真实姓名</label>
+              <input v-model="realNameForm.name" class="input" placeholder="请输入真实姓名" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label>身份证号</label>
+              <input v-model="realNameForm.idcard" class="input" placeholder="请输入身份证号" autocomplete="off" />
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showRealName = false">关闭</button>
+          <button v-if="realNameStatus.status !== 'verified'" class="btn" :disabled="securityLoading" @click="submitRealName">提交认证</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 邮箱绑定弹窗 -->
+    <div v-if="showBindEmail" class="modal-overlay" @click.self="showBindEmail = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>绑定邮箱</h3>
+          <button class="close-btn" @click="showBindEmail = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <p v-if="user.emailVerified" class="form-tip">当前已绑定：{{ user.email }}</p>
+          <div class="form-group">
+            <label>邮箱</label>
+            <input v-model="emailForm.email" type="email" class="input" placeholder="请输入邮箱地址" autocomplete="email" />
+          </div>
+          <div class="form-group code-row">
+            <div class="code-input">
+              <label>验证码</label>
+              <input v-model="emailForm.code" class="input" placeholder="请输入验证码" autocomplete="one-time-code" />
+            </div>
+            <button class="btn btn-secondary" :disabled="securityLoading" @click="sendBindEmailCode">发送验证码</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showBindEmail = false">取消</button>
+          <button class="btn" :disabled="securityLoading" @click="confirmBindEmail">确认绑定</button>
+        </div>
+      </div>
+    </div>
+    
     <!-- 通知设置弹窗 -->
     <div v-if="showNotification" class="modal-overlay" @click.self="showNotification = false">
       <div class="modal-content">
@@ -245,6 +336,28 @@ const stats = ref({
 const showEditProfile = ref(false);
 const showChangePassword = ref(false);
 const showNotification = ref(false);
+const showRealName = ref(false);
+const showBindEmail = ref(false);
+const securityLoading = ref(false);
+
+const realNameStatus = ref({
+  status: 'unverified',
+  realNameMasked: '',
+  idCardMasked: '',
+  gender: '',
+  birthday: '',
+  region: ''
+});
+
+const realNameForm = ref({
+  name: '',
+  idcard: ''
+});
+
+const emailForm = ref({
+  email: '',
+  code: ''
+});
 
 const editForm = ref({
   nickname: '',
@@ -275,6 +388,21 @@ async function loadUserInfo() {
       friendVerification: user.value.friendVerification !== false,
       desktopNotifications: user.value.desktopNotifications !== false,
       soundNotifications: user.value.soundNotifications !== false
+    };
+    emailForm.value.email = user.value.email || '';
+  }
+}
+
+async function loadRealNameStatus() {
+  const res = await userApi.getRealNameStatus();
+  if (res.ok) {
+    realNameStatus.value = {
+      status: res.data?.status || 'unverified',
+      realNameMasked: res.data?.realNameMasked || '',
+      idCardMasked: res.data?.idCardMasked || '',
+      gender: res.data?.gender || '',
+      birthday: res.data?.birthday || '',
+      region: res.data?.region || ''
     };
   }
 }
@@ -341,6 +469,70 @@ async function handleSaveNotification() {
   }
 }
 
+async function submitRealName() {
+  if (!realNameForm.value.name.trim() || !realNameForm.value.idcard.trim()) {
+    toastStore.warning('请填写真实姓名和身份证号');
+    return;
+  }
+
+  securityLoading.value = true;
+  try {
+    const res = await userApi.submitRealName(realNameForm.value);
+    if (res.ok) {
+      toastStore.success('实名认证成功');
+      showRealName.value = false;
+      realNameForm.value = { name: '', idcard: '' };
+      await Promise.all([loadRealNameStatus(), loadUserInfo()]);
+    } else {
+      toastStore.error(res.msg || '认证失败');
+    }
+  } finally {
+    securityLoading.value = false;
+  }
+}
+
+async function sendBindEmailCode() {
+  if (!emailForm.value.email.trim()) {
+    toastStore.warning('请输入邮箱地址');
+    return;
+  }
+
+  securityLoading.value = true;
+  try {
+    const res = await userApi.sendBindEmailCode(emailForm.value.email);
+    if (res.ok) {
+      toastStore.success(res.msg || '验证码已发送');
+    } else {
+      toastStore.error(res.msg || '发送失败');
+    }
+  } finally {
+    securityLoading.value = false;
+  }
+}
+
+async function confirmBindEmail() {
+  if (!emailForm.value.email.trim() || !emailForm.value.code.trim()) {
+    toastStore.warning('请填写邮箱和验证码');
+    return;
+  }
+
+  securityLoading.value = true;
+  try {
+    const res = await userApi.confirmBindEmail(emailForm.value);
+    if (res.ok) {
+      toastStore.success('邮箱绑定成功');
+      showBindEmail.value = false;
+      emailForm.value.code = '';
+      await loadUserInfo();
+      await userStore.refreshUserInfo();
+    } else {
+      toastStore.error(res.msg || '绑定失败');
+    }
+  } finally {
+    securityLoading.value = false;
+  }
+}
+
 async function copyInvitationCode() {
   try {
     await navigator.clipboard.writeText(user.value.invitationCode);
@@ -356,7 +548,7 @@ function handleLogout() {
 }
 
 onMounted(async () => {
-  await Promise.all([loadUserInfo(), loadStats()]);
+  await Promise.all([loadUserInfo(), loadStats(), loadRealNameStatus()]);
 });
 </script>
 
@@ -422,7 +614,26 @@ onMounted(async () => {
 .profile-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+}
+
+.security-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(244, 231, 220, 0.86);
+  border: 1px solid rgba(197, 138, 58, 0.28);
+  border-radius: var(--radius-lg);
+
+  .notice-icon {
+    font-size: 24px;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+  }
 }
 
 .section {
@@ -721,6 +932,33 @@ onMounted(async () => {
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
     }
+  }
+}
+
+.form-tip {
+  margin: 0 0 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.verified-card {
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+
+  p {
+    margin: 8px 0 0;
+    color: var(--text-secondary);
+  }
+}
+
+.code-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+
+  .code-input {
+    flex: 1;
   }
 }
 </style>

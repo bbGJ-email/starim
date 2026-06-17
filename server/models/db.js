@@ -110,16 +110,55 @@ async function initTables() {
         updatedAt DATETIME,
         signature TEXT,
         email VARCHAR(100),
-        phone VARCHAR(20)
+        emailVerified BOOLEAN DEFAULT false,
+        phone VARCHAR(20),
+        realNameStatus VARCHAR(20) DEFAULT 'unverified',
+        realNameMasked VARCHAR(100),
+        idCardMasked VARCHAR(50),
+        realNameGender VARCHAR(10),
+        realNameBirthday VARCHAR(20),
+        realNameRegion VARCHAR(255),
+        tokenVersion INT DEFAULT 0,
+        passwordUpdatedAt DATETIME
       )
     `);
 
     // 添加缺失的列到 st_users
     await safeAddColumn('st_users', 'signature', 'TEXT');
     await safeAddColumn('st_users', 'email', 'VARCHAR(100)');
+    await safeAddColumn('st_users', 'emailVerified', 'BOOLEAN DEFAULT false');
     await safeAddColumn('st_users', 'phone', 'VARCHAR(20)');
+    await safeAddColumn('st_users', 'realNameStatus', "VARCHAR(20) DEFAULT 'unverified'");
+    await safeAddColumn('st_users', 'realNameMasked', 'VARCHAR(100)');
+    await safeAddColumn('st_users', 'idCardMasked', 'VARCHAR(50)');
+    await safeAddColumn('st_users', 'realNameGender', 'VARCHAR(10)');
+    await safeAddColumn('st_users', 'realNameBirthday', 'VARCHAR(20)');
+    await safeAddColumn('st_users', 'realNameRegion', 'VARCHAR(255)');
+    await safeAddColumn('st_users', 'tokenVersion', 'INT DEFAULT 0');
+    await safeAddColumn('st_users', 'passwordUpdatedAt', 'DATETIME');
     await safeAddColumn('st_users', 'updatedAt', 'DATETIME');
     await safeAddColumn('st_users', 'createdAt', 'DATETIME');
+
+    // 创建邮箱验证码表
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS st_email_verification_codes (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(100) NOT NULL,
+        purpose VARCHAR(30) NOT NULL,
+        codeHash VARCHAR(255) NOT NULL,
+        expiresAt DATETIME NOT NULL,
+        used BOOLEAN DEFAULT false,
+        usedAt DATETIME,
+        attempts INT DEFAULT 0,
+        ip VARCHAR(45),
+        userId VARCHAR(36),
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_email_purpose (email, purpose),
+        INDEX idx_expires_at (expiresAt),
+        INDEX idx_user_id (userId)
+      )
+    `);
 
     // 创建消息表
     await pool.execute(`

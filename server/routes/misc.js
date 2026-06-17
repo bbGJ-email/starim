@@ -3,6 +3,43 @@ const router = express.Router();
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
+const { authenticateToken } = require('../middlewares/auth');
+const { filterSensitiveWords } = require('../utils/sanitize');
+
+async function ensurePublicAccountTables(pool) {
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS st_public_accounts (
+      id VARCHAR(36) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      description TEXT,
+      avatar VARCHAR(255),
+      ownerId VARCHAR(36) NOT NULL,
+      followers JSON,
+      createdAt DATETIME
+    )
+  `);
+}
+
+function parseFollowers(followers) {
+  if (!followers) return [];
+  if (Array.isArray(followers)) return followers;
+  try {
+    return JSON.parse(followers);
+  } catch (e) {
+    return [];
+  }
+}
+
+function toPublicAccount(account, userId) {
+  const followers = parseFollowers(account.followers);
+  return {
+    ...account,
+    followers,
+    followerCount: followers.length,
+    subscribed: followers.includes(userId),
+    isOwner: account.ownerId === userId
+  };
+}
 
 // 图片代理（解决CORS和HTTP混合内容问题）
 router.get('/image/proxy', (req, res) => {
@@ -62,40 +99,119 @@ router.get('/privacy-policy', (req, res) => {
   });
 });
 
-// 公众号注册
-router.post('/public-account/register', async (req, res) => {
+// 公众号列表
+router.post('/public-account/list', authenticateToken, async (req, res) => {
   try {
-    const { name, description, avatar, ownerId } = req.body;
+    const { pool } = require('../models/db');
+    await ensurePublicAccountTables(pool);
+
+    const [rows] = await pool.execute('SELECT * FROM st_public_accounts ORDER BY createdAt DESC');
+    res.json({ ok: true, data: rows.map((account) => toPublicAccount(account, req.user.id)) });
+  } catch (error) {
+    res.json({ ok: false, msg: '获取公众号列表失败', error: error.message });
+  }
+});
+
+// 公众号详情
+router.post('/public-account/detail', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.json({ ok: false, msg: '缺少公众号ID' });
+    }
+
+    const { pool } = require('../models/db');
+    await ensurePublicAccountTables(pool);
+
+    const [rows] = await pool.execute('SELECT * FROM st_public_accounts WHERE id = ? LIMIT 1', [id]);
+    if (!rows[0]) {
+      return res.json({ ok: false, msg: '公众号不存在' });
+    }
+
+    res.json({ ok: true, data: toPublicAccount(rows[0], req.user.id) });
+  } catch (error) {
+    res.json({ ok: false, msg: '获取公众号详情失败', error: error.message });
+  }
+});
+
+// 公众号注册
+router.post('/public-account/register', authenticateToken, async (req, res) => {
+  try {
+    const { name, description, avatar } = req.body;
     const { pool } = require('../models/db');
     const { generateId } = require('../utils/idGenerator');
 
-    if (!name || !ownerId) {
-      return res.json({ ok: false, msg: '参数不完整' });
+    if (!name) {
+      return res.json({ ok: false, msg: '公众号名称不能为空' });
     }
 
-    await pool.execute(`
-      CREATE TABLE IF NOT EXISTS st_public_accounts (
-        id VARCHAR(36) PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        description TEXT,
-        avatar VARCHAR(255),
-        ownerId VARCHAR(36) NOT NULL,
-        followers JSON,
-        createdAt DATETIME
-      )
-    `);
+    await ensurePublicAccountTables(pool);
 
     const id = generateId();
     const createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const filteredName = await filterSensitiveWords(name);
+    const filteredDescription = await filterSensitiveWords(description || '');
 
     await pool.execute(
       'INSERT INTO st_public_accounts (id, name, description, avatar, ownerId, followers, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, name, description || '', avatar || null, ownerId, '[]', createdAt]
+      [id, filteredName, filteredDescription, avatar || null, req.user.id, '[]', createdAt]
     );
 
-    res.json({ ok: true, msg: '公众号注册成功', id });
+    const [rows] = await pool.execute('SELECT * FROM st_public_accounts WHERE id = ? LIMIT 1', [id]);
+    res.json({ ok: true, msg: '公众号注册成功', data: toPublicAccount(rows[0], req.user.id), id });
   } catch (error) {
     res.json({ ok: false, msg: '注册失败', error: error.message });
+  }
+});
+
+router.post('/public-account/subscribe', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.json({ ok: false, msg: '缺少公众号ID' });
+    }
+
+    const { pool } = require('../models/db');
+    await ensurePublicAccountTables(pool);
+
+    const [rows] = await pool.execute('SELECT * FROM st_public_accounts WHERE id = ? LIMIT 1', [id]);
+    if (!rows[0]) {
+      return res.json({ ok: false, msg: '公众号不存在' });
+    }
+
+    const followers = parseFollowers(rows[0].followers);
+    if (!followers.includes(req.user.id)) {
+      followers.push(req.user.id);
+      await pool.execute('UPDATE st_public_accounts SET followers = ? WHERE id = ?', [JSON.stringify(followers), id]);
+    }
+
+    res.json({ ok: true, msg: '订阅成功' });
+  } catch (error) {
+    res.json({ ok: false, msg: '订阅失败', error: error.message });
+  }
+});
+
+router.post('/public-account/unsubscribe', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) {
+      return res.json({ ok: false, msg: '缺少公众号ID' });
+    }
+
+    const { pool } = require('../models/db');
+    await ensurePublicAccountTables(pool);
+
+    const [rows] = await pool.execute('SELECT * FROM st_public_accounts WHERE id = ? LIMIT 1', [id]);
+    if (!rows[0]) {
+      return res.json({ ok: false, msg: '公众号不存在' });
+    }
+
+    const followers = parseFollowers(rows[0].followers).filter((userId) => userId !== req.user.id);
+    await pool.execute('UPDATE st_public_accounts SET followers = ? WHERE id = ?', [JSON.stringify(followers), id]);
+
+    res.json({ ok: true, msg: '已取消订阅' });
+  } catch (error) {
+    res.json({ ok: false, msg: '取消订阅失败', error: error.message });
   }
 });
 
