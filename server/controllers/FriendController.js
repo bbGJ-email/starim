@@ -232,7 +232,7 @@ class FriendController {
 
   static async accept(req, res) {
     try {
-      const { requestId } = req.body;
+      const requestId = req.body?.requestId || req.body?.id;
       if (!requestId) {
         return res.json({ ok: false, msg: '缺少请求ID' });
       }
@@ -268,6 +268,7 @@ class FriendController {
 
       res.json({ ok: true, msg: '已接受好友请求' });
     } catch (error) {
+      console.error('接受好友请求失败:', error);
       res.json({ ok: false, msg: '接受好友请求失败', error: error.message });
     }
   }

@@ -23,8 +23,8 @@ class Message {
     try {
       await pool.execute(
         `INSERT INTO st_messages 
-        (id, senderId, receiverId, groupId, content, type, fileName, timestamp, quotedMessage, cardUser, cardGroup) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, senderId, receiverId, groupId, content, type, fileName, timestamp, quotedMessage, cardUser, cardGroup, moderationStatus, isBlocked) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           senderId,
@@ -36,7 +36,9 @@ class Message {
           timestamp,
           quotedMessage ? JSON.stringify(quotedMessage) : null,
           cardUser ? JSON.stringify(cardUser) : null,
-          cardGroup ? JSON.stringify(cardGroup) : null
+          cardGroup ? JSON.stringify(cardGroup) : null,
+          'pending',
+          false
         ]
       );
       return await this.findById(id);
@@ -116,6 +118,22 @@ class Message {
       return true;
     } catch (error) {
       console.error('撤回消息失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 屏蔽消息
+   */
+  static async block(messageId, blockedText) {
+    try {
+      await pool.execute(
+        'UPDATE st_messages SET content = ?, moderationStatus = ?, isBlocked = true WHERE id = ?',
+        [blockedText, 'blocked', messageId]
+      );
+      return true;
+    } catch (error) {
+      console.error('屏蔽消息失败:', error);
       return false;
     }
   }

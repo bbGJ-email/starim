@@ -12,7 +12,33 @@
           <img class="auth-logo" src="https://s41.ax1x.com/2026/01/19/pZ6lpFI.png" alt="星智IM" />
         </div>
         <h1 class="auth-title">星智IM</h1>
-        <p class="auth-subtitle">欢迎回来，请登录您的账号</p>
+        <div class="auth-notice">
+          <div class="notice-badge">重要提示</div>
+          <div class="notice-content">
+            <h2>数据库已完成清空与重置</h2>
+            <p>当前为全新环境，历史账号、消息和资料已清理，请使用新账号登录或重新注册。</p>
+          </div>
+        </div>
+        <div class="auth-update-card">
+          <div class="update-card-header">
+            <span class="update-badge">内容安全更新</span>
+            <h2>异步审核已上线</h2>
+          </div>
+          <div class="update-feature-list">
+            <div class="update-feature">
+              <span class="feature-dot">AI</span>
+              <p>三层 AI / 接口 / 本地词库按序审核，异常自动降级。</p>
+            </div>
+            <div class="update-feature">
+              <span class="feature-dot">快</span>
+              <p>消息先发送再后台审核，对话发送体验不被阻塞。</p>
+            </div>
+            <div class="update-feature">
+              <span class="feature-dot">护</span>
+              <p>命中敏感内容后自动屏蔽，并实时更新当前消息气泡。</p>
+            </div>
+          </div>
+        </div>
       </div>
       
       <form @submit.prevent="handleLogin" class="auth-form">
@@ -191,12 +217,14 @@ async function resetPassword() {
 .auth-container {
   position: relative;
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 32px 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: hidden auto;
   background: var(--gradient-bg);
+  box-sizing: border-box;
 }
 
 .auth-bg {
@@ -299,11 +327,113 @@ async function resetPassword() {
   font-size: 14px;
 }
 
+.auth-notice {
+  margin: 20px 0 24px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(246, 238, 226, 0.96), rgba(239, 230, 218, 0.9));
+  border: 1px solid rgba(149, 117, 89, 0.18);
+  box-shadow: 0 12px 28px rgba(98, 74, 55, 0.08);
+}
+
+.notice-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: rgba(98, 74, 55, 0.08);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.notice-content h2 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.notice-content p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.auth-update-card {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255, 250, 244, 0.96), rgba(245, 231, 214, 0.9));
+  border: 1px solid rgba(154, 106, 79, 0.16);
+  box-shadow: 0 14px 30px rgba(98, 74, 55, 0.08);
+  text-align: left;
+}
+
+.update-card-header {
+  margin-bottom: 12px;
+
+  h2 {
+    margin: 8px 0 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    line-height: 1.35;
+  }
+}
+
+.update-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(154, 106, 79, 0.1);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.update-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.update-feature {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+}
+
+.feature-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(154, 106, 79, 0.12);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
+
 
 .form-group {
   display: flex;

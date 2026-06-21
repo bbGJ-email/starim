@@ -14,7 +14,7 @@ class Moment {
   static async findAll(page = 1, size = 20) {
     const offset = (page - 1) * size;
     const [rows] = await pool.execute(
-      `SELECT m.id, m.userId, m.content, m.images, m.createdAt, u.nickname, u.avatar
+      `SELECT m.id, m.userId, m.content, m.images, m.createdAt, m.moderationStatus, m.isBlocked, u.nickname, u.avatar
        FROM moments m
        LEFT JOIN st_users u ON m.userId = u.id
        ORDER BY m.createdAt DESC
@@ -28,6 +28,8 @@ class Moment {
         content: row.content,
         images: row.images ? (typeof row.images === 'string' ? JSON.parse(row.images) : row.images) : [],
         createdAt: row.createdAt,
+        moderationStatus: row.moderationStatus,
+        isBlocked: Boolean(row.isBlocked),
         user: {
           id: String(row.userId),
           nickname: row.nickname || '未知用户',
@@ -45,7 +47,7 @@ class Moment {
 
   static async findById(id) {
     const [rows] = await pool.execute(
-      `SELECT m.id, m.userId, m.content, m.images, m.createdAt, u.nickname, u.avatar
+      `SELECT m.id, m.userId, m.content, m.images, m.createdAt, m.moderationStatus, m.isBlocked, u.nickname, u.avatar
        FROM moments m
        LEFT JOIN st_users u ON m.userId = u.id
        WHERE m.id = ?`,
@@ -59,6 +61,8 @@ class Moment {
       content: row.content,
       images: row.images ? (typeof row.images === 'string' ? JSON.parse(row.images) : row.images) : [],
       createdAt: row.createdAt,
+      moderationStatus: row.moderationStatus,
+      isBlocked: Boolean(row.isBlocked),
       user: {
         id: String(row.userId),
         nickname: row.nickname || '未知用户',
@@ -72,6 +76,13 @@ class Moment {
     await pool.execute(
       'UPDATE moments SET content = ?, images = ? WHERE id = ?',
       [content, JSON.stringify(images || []), id]
+    );
+  }
+
+  static async block(id, blockedText) {
+    await pool.execute(
+      'UPDATE moments SET content = ?, moderationStatus = ?, isBlocked = true WHERE id = ?',
+      [blockedText, 'blocked', id]
     );
   }
 
@@ -133,7 +144,7 @@ class Moment {
 
   static async getComments(momentId) {
     const [rows] = await pool.execute(
-      `SELECT c.id, c.momentId, c.userId, c.content, c.createdAt, u.nickname, u.avatar
+      `SELECT c.id, c.momentId, c.userId, c.content, c.createdAt, c.moderationStatus, c.isBlocked, u.nickname, u.avatar
        FROM moment_comments c
        LEFT JOIN st_users u ON c.userId = u.id
        WHERE c.momentId = ?
@@ -146,6 +157,8 @@ class Moment {
       userId: String(row.userId),
       content: row.content,
       createdAt: row.createdAt,
+      moderationStatus: row.moderationStatus,
+      isBlocked: Boolean(row.isBlocked),
       user: {
         id: String(row.userId),
         nickname: row.nickname || '未知用户',

@@ -3,7 +3,8 @@
     class="message-item"
     :class="{
       'message-self': isSelf,
-      'message-system': message.type === 'system'
+      'message-system': message.type === 'system',
+      'message-blocked': isBlockedMessage
     }"
     @contextmenu.prevent="showContextMenu"
   >
@@ -39,14 +40,21 @@
         </div>
 
         <!-- 消息内容 -->
-        <div class="message-text" :class="{ 'recalled': message.isRecalled }">
-          {{ message.isRecalled ? '消息已撤回' : message.content }}
+        <div class="message-text" :class="{ 'recalled': message.isRecalled, 'blocked': isBlockedMessage }">
+          <template v-if="isBlockedMessage">
+            <span class="blocked-icon">盾</span>
+            <span>{{ blockedText }}</span>
+          </template>
+          <template v-else>
+            {{ message.isRecalled ? '消息已撤回' : message.content }}
+          </template>
         </div>
 
         <!-- 消息时间 -->
         <div class="message-time">
           {{ formatMessageTime(message.timestamp) }}
-          <span v-if="message.isRecalled" class="recalled-tag">已撤回</span>
+          <span v-if="isBlockedMessage" class="blocked-tag">已屏蔽</span>
+          <span v-else-if="message.isRecalled" class="recalled-tag">已撤回</span>
         </div>
       </div>
     </div>
@@ -104,6 +112,16 @@ const isSelf = computed(() => {
   const currentUserId = userStore.user?.id || JSON.parse(localStorage.getItem('userData') || '{}').id;
   return props.message.senderId === currentUserId;
 });
+
+const blockedText = '检测到敏感内容，已自动屏蔽';
+
+const isBlockedMessage = computed(() => (
+  props.message.isBlocked === true ||
+  props.message.isBlocked === 1 ||
+  props.message.isBlocked === 'true' ||
+  props.message.moderationStatus === 'blocked' ||
+  props.message.content === blockedText
+));
 
 function showContextMenu(event) {
   contextMenuPosition.x = event.clientX;
@@ -212,6 +230,49 @@ function formatMessageTime(timestamp) {
           color: rgba(255, 255, 255, 0.6);
         }
       }
+    }
+  }
+
+  &.message-blocked {
+    .message-bubble {
+      background: linear-gradient(135deg, rgba(255, 246, 235, 0.98), rgba(244, 225, 204, 0.94));
+      color: #6f4f36;
+      border: 1px solid rgba(173, 119, 78, 0.26);
+      box-shadow: 0 10px 24px rgba(98, 74, 55, 0.1);
+    }
+
+    .message-text.blocked {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #7b5b40;
+      font-weight: 600;
+    }
+
+    .blocked-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(154, 106, 79, 0.14);
+      color: var(--primary);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .message-time {
+      color: rgba(111, 79, 54, 0.64);
+    }
+
+    .blocked-tag {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(154, 106, 79, 0.12);
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 600;
     }
   }
 

@@ -24,6 +24,7 @@ const { onlineUsers } = require('./utils/onlineUsers');
 
 // 创建Express应用
 const app = express();
+app.set('trust proxy', config.server.trustProxy);
 const server = http.createServer(app);
 
 // 创建Socket.IO实例

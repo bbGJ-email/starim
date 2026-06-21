@@ -3,7 +3,7 @@ const EmailVerificationCode = require('../models/EmailVerificationCode');
 const { pool } = require('../models/db');
 const { getLastSeen, isUserOnline } = require('../utils/onlineUsers');
 const { getClientIP, recordRiskEvent } = require('../middlewares/ipBan');
-const { sendEmailCode } = require('../utils/email');
+const { sendEmailCode, normalizeEmail, isValidEmail } = require('../utils/email');
 const config = require('../config/app');
 
 function maskRealName(name) {
@@ -15,14 +15,6 @@ function maskRealName(name) {
 function maskIdCard(idcard) {
   if (!idcard || idcard.length < 8) return '';
   return `${idcard.slice(0, 3)}***********${idcard.slice(-4)}`;
-}
-
-function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 class UserController {

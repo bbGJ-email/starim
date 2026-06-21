@@ -171,6 +171,17 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
   
+  function handleMessageUpdated(message) {
+    if (!message?.id) return;
+
+    const msg = messages.value.find(m => m.id === message.id);
+    if (msg) {
+      Object.assign(msg, message);
+    }
+
+    updateLastMessage(message);
+  }
+
   function updateLastMessage(message) {
     if (message.groupId) {
       const group = groups.value.find(g => g.id === message.groupId);
@@ -257,6 +268,7 @@ export const useChatStore = defineStore('chat', () => {
     handleNewMessage,
     handleMessageRead,
     handleMessageRecalled,
+    handleMessageUpdated,
     sendMessage,
     recallMessage,
     scrollToBottom,

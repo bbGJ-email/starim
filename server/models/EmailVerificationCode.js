@@ -37,16 +37,12 @@ class EmailVerificationCode {
   }
 
   static async create(email, purpose, code, ip, userId = null) {
-    const expiresAt = new Date(Date.now() + config.emailCode.expiresMinutes * 60 * 1000)
-      .toISOString()
-      .slice(0, 19)
-      .replace('T', ' ');
     const codeHash = this.hashCode(email, purpose, code);
 
     await pool.execute(
       `INSERT INTO st_email_verification_codes (email, purpose, codeHash, expiresAt, ip, userId)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [email, purpose, codeHash, expiresAt, ip, userId]
+       VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, ?)`,
+      [email, purpose, codeHash, config.emailCode.expiresMinutes, ip, userId]
     );
   }
 
@@ -67,6 +63,7 @@ class EmailVerificationCode {
 
     const record = rows[0];
     if (!record) {
+      console.warn('邮箱验证码未找到或已过期:', { email, purpose, userId });
       return { ok: false, msg: '验证码无效或已过期' };
     }
 

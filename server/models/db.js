@@ -119,7 +119,8 @@ async function initTables() {
         realNameBirthday VARCHAR(20),
         realNameRegion VARCHAR(255),
         tokenVersion INT DEFAULT 0,
-        passwordUpdatedAt DATETIME
+        passwordUpdatedAt DATETIME,
+        friends JSON
       )
     `);
 
@@ -136,6 +137,7 @@ async function initTables() {
     await safeAddColumn('st_users', 'realNameRegion', 'VARCHAR(255)');
     await safeAddColumn('st_users', 'tokenVersion', 'INT DEFAULT 0');
     await safeAddColumn('st_users', 'passwordUpdatedAt', 'DATETIME');
+    await safeAddColumn('st_users', 'friends', 'JSON');
     await safeAddColumn('st_users', 'updatedAt', 'DATETIME');
     await safeAddColumn('st_users', 'createdAt', 'DATETIME');
 
@@ -175,9 +177,14 @@ async function initTables() {
         cardUser JSON,
         cardGroup JSON,
         \`read\` BOOLEAN DEFAULT false,
-        isRecalled BOOLEAN DEFAULT false
+        isRecalled BOOLEAN DEFAULT false,
+        moderationStatus VARCHAR(20) DEFAULT 'pending',
+        isBlocked BOOLEAN DEFAULT false
       )
     `);
+
+    await safeAddColumn('st_messages', 'moderationStatus', "VARCHAR(20) DEFAULT 'pending'");
+    await safeAddColumn('st_messages', 'isBlocked', 'BOOLEAN DEFAULT false');
 
     // 创建群组表
     await pool.execute(`
@@ -219,6 +226,18 @@ async function initTables() {
       )
     `);
 
+    // 创建好友请求表
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS st_friend_requests (
+        id VARCHAR(36) PRIMARY KEY,
+        fromUserId VARCHAR(36) NOT NULL,
+        toUserId VARCHAR(36) NOT NULL,
+        message TEXT,
+        status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
+        createdAt DATETIME
+      )
+    `);
+
     // 创建动态表
     await pool.execute(`
       CREATE TABLE IF NOT EXISTS moments (
@@ -226,11 +245,15 @@ async function initTables() {
         userId VARCHAR(36) NOT NULL,
         content TEXT NOT NULL,
         images JSON,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        moderationStatus VARCHAR(20) DEFAULT 'pending',
+        isBlocked BOOLEAN DEFAULT false
       )
     `);
 
     // 检查 moments 表的现有结构并进行必要的迁移
+    await safeAddColumn('moments', 'moderationStatus', "VARCHAR(20) DEFAULT 'pending'");
+    await safeAddColumn('moments', 'isBlocked', 'BOOLEAN DEFAULT false');
     const momentsSchema = await getTableSchema('moments');
     if (momentsSchema.length > 0) {
       console.log('moments 表结构:', momentsSchema);
@@ -268,9 +291,14 @@ async function initTables() {
         momentId INT NOT NULL,
         userId VARCHAR(36) NOT NULL,
         content TEXT NOT NULL,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        moderationStatus VARCHAR(20) DEFAULT 'pending',
+        isBlocked BOOLEAN DEFAULT false
       )
     `);
+
+    await safeAddColumn('moment_comments', 'moderationStatus', "VARCHAR(20) DEFAULT 'pending'");
+    await safeAddColumn('moment_comments', 'isBlocked', 'BOOLEAN DEFAULT false');
 
     // 创建举报表
     await pool.execute(`
@@ -331,6 +359,7 @@ async function initTables() {
     console.log('✅ 数据库表初始化完成');
   } catch (error) {
     console.error('❌ 数据库表初始化失败:', error);
+    throw error;
   }
 }
 

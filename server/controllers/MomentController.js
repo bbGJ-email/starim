@@ -1,7 +1,6 @@
 const Moment = require('../models/Moment');
 const User = require('../models/User');
-const { generateId } = require('../utils/idGenerator');
-const { filterSensitiveWords } = require('../utils/sanitize');
+const { enqueueMomentModeration, enqueueMomentCommentModeration } = require('../utils/asyncContentModeration');
 
 class MomentController {
   static async publish(req, res) {
@@ -11,14 +10,19 @@ class MomentController {
         return res.json({ ok: false, msg: '内容不能为空' });
       }
 
-      const filteredContent = await filterSensitiveWords(content);
       const momentId = await Moment.create({
         userId: req.user.id,
-        content: filteredContent
+        content
       });
 
       const moment = await Moment.findById(momentId);
       moment.user = User.filterSensitiveInfo(req.user);
+
+      enqueueMomentModeration({
+        momentId,
+        content,
+        userId: req.user.id
+      });
 
       res.json({ ok: true, msg: '发布成功', moment });
     } catch (error) {
@@ -58,8 +62,15 @@ class MomentController {
         return res.json({ ok: false, msg: '参数不完整' });
       }
 
-      const filteredContent = await filterSensitiveWords(content);
-      const success = await Moment.comment(momentId, req.user.id, filteredContent);
+      const success = await Moment.comment(momentId, req.user.id, content);
+      if (success) {
+        enqueueMomentCommentModeration({
+          commentId: success,
+          momentId,
+          content,
+          userId: req.user.id
+        });
+      }
       res.json({ ok: success, msg: success ? '评论成功' : '评论失败' });
     } catch (error) {
       res.json({ ok: false, msg: '评论失败', error: error.message });

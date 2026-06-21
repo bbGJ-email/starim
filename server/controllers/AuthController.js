@@ -3,15 +3,7 @@ const EmailVerificationCode = require('../models/EmailVerificationCode');
 const { generateToken } = require('../middlewares/auth');
 const { generateId, generateInvitationCode } = require('../utils/idGenerator');
 const { getClientIP, recordRiskEvent } = require('../middlewares/ipBan');
-const { sendEmailCode } = require('../utils/email');
-
-function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+const { sendEmailCode, normalizeEmail, isValidEmail } = require('../utils/email');
 
 class AuthController {
   static async register(req, res) {

@@ -9,14 +9,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src')
     }
   },
+  base: '/',
   server: {
     port: 5175,
     host: '0.0.0.0',
-    // 放行你的域名
-    allowedHosts: ['starim.xingk.xyz'],
+    allowedHosts: ['starim.xingk.xyz', 'localhost'],
     cors: {
       origin: [
         'http://localhost:5173',
+        'http://localhost:5175',
         'https://starim.xingk.xyz'
       ],
       credentials: true

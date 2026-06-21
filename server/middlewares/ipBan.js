@@ -4,21 +4,19 @@ const tempBans = new Map();
 const riskScores = new Map();
 
 const RISK_POINTS = {
-  login_failed: 35,
-  captcha_abuse: 30,
-  rate_limit: 45
+  login_failed: 15,
+  captcha_abuse: 15,
+  rate_limit: 20
 };
 
-const RISK_THRESHOLD = 100;
-const SCORE_TTL_MS = 15 * 60 * 1000;
-const DEFAULT_BAN_MS = 15 * 60 * 1000;
+const RISK_THRESHOLD = 150;
+const SCORE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_BAN_MS = 5 * 60 * 1000;
 
 const getClientIP = (req) => {
-  return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-         req.headers['x-real-ip'] ||
+  return req.ip ||
          req.connection.remoteAddress ||
-         req.socket.remoteAddress ||
-         req.ip;
+         req.socket.remoteAddress;
 };
 
 function cleanupExpiredRisk(now = Date.now()) {

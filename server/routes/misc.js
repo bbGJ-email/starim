@@ -4,7 +4,7 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 const { authenticateToken } = require('../middlewares/auth');
-const { filterSensitiveWords } = require('../utils/sanitize');
+const { enqueuePublicAccountModeration } = require('../utils/asyncContentModeration');
 
 async function ensurePublicAccountTables(pool) {
   await pool.execute(`
@@ -15,9 +15,23 @@ async function ensurePublicAccountTables(pool) {
       avatar VARCHAR(255),
       ownerId VARCHAR(36) NOT NULL,
       followers JSON,
-      createdAt DATETIME
+      createdAt DATETIME,
+      moderationStatus VARCHAR(20) DEFAULT 'pending',
+      isBlocked BOOLEAN DEFAULT false
     )
   `);
+  await safeAddColumn(pool, 'st_public_accounts', 'moderationStatus', "VARCHAR(20) DEFAULT 'pending'");
+  await safeAddColumn(pool, 'st_public_accounts', 'isBlocked', 'BOOLEAN DEFAULT false');
+}
+
+async function safeAddColumn(pool, table, column, columnDef) {
+  try {
+    await pool.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${columnDef}`);
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') {
+      console.error(`添加列 ${table}.${column} 失败:`, error.message);
+    }
+  }
 }
 
 function parseFollowers(followers) {
@@ -149,15 +163,18 @@ router.post('/public-account/register', authenticateToken, async (req, res) => {
 
     const id = generateId();
     const createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const filteredName = await filterSensitiveWords(name);
-    const filteredDescription = await filterSensitiveWords(description || '');
-
     await pool.execute(
       'INSERT INTO st_public_accounts (id, name, description, avatar, ownerId, followers, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, filteredName, filteredDescription, avatar || null, req.user.id, '[]', createdAt]
+      [id, name, description || '', avatar || null, req.user.id, '[]', createdAt]
     );
 
     const [rows] = await pool.execute('SELECT * FROM st_public_accounts WHERE id = ? LIMIT 1', [id]);
+    enqueuePublicAccountModeration({
+      accountId: id,
+      name,
+      description: description || '',
+      ownerId: req.user.id
+    });
     res.json({ ok: true, msg: '公众号注册成功', data: toPublicAccount(rows[0], req.user.id), id });
   } catch (error) {
     res.json({ ok: false, msg: '注册失败', error: error.message });

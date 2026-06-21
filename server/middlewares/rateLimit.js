@@ -24,6 +24,7 @@ const createRateLimiter = (options = {}) => {
       const ip = getClientIP(req);
       return rateLimitConfig.ignoredIps && rateLimitConfig.ignoredIps.includes(ip);
     },
+    keyGenerator: (req) => getClientIP(req),
     handler: (req, res, next, opts) => {
       recordRiskEvent(getClientIP(req), 'rate_limit', { reason: '限流触发过多' });
       res.status(opts.statusCode).json(opts.message);
@@ -40,7 +41,7 @@ const apiLimiter = createRateLimiter({
 
 const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: { ok: false, msg: '登录尝试次数过多，请15分钟后再试' }
 });
 

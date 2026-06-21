@@ -4,7 +4,7 @@ const User = require('../models/User');
 const Group = require('../models/Group');
 const { pool } = require('../models/db');
 const { generateId } = require('../utils/idGenerator');
-const { filterSensitiveWords, sanitizeText } = require('../utils/sanitize');
+const { enqueueMessageModeration } = require('../utils/asyncContentModeration');
 
 class MessageController {
   static async getList(req, res) {
@@ -58,19 +58,13 @@ class MessageController {
         return res.json({ ok: false, msg: '必须指定接收者或群组' });
       }
 
-      // 过滤敏感词
-      let filteredContent = content;
-      if (type === 'text' && content) {
-        filteredContent = await filterSensitiveWords(content);
-      }
-
       const messageId = generateId();
       const message = await Message.create({
         id: messageId,
         senderId: req.user.id,
         receiverId: receiverId || null,
         groupId: groupId || null,
-        content: filteredContent,
+        content,
         type,
         fileName,
         quotedMessage,
@@ -91,6 +85,15 @@ class MessageController {
           io.to(`user_${req.user.id}`).emit('new_message', message);
         }
       }
+
+      enqueueMessageModeration({
+        messageId,
+        content,
+        senderId: req.user.id,
+        receiverId: receiverId || null,
+        groupId: groupId || null,
+        io
+      });
 
       res.json({ ok: true, msg: '发送成功', message });
     } catch (error) {

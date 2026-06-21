@@ -35,6 +35,16 @@ async function sendEmailCode(email, code, purpose) {
   });
 }
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 module.exports = {
-  sendEmailCode
+  sendEmailCode,
+  normalizeEmail,
+  isValidEmail
 };

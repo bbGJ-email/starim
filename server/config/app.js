@@ -16,6 +16,8 @@ const uploadAllowedExtensions = (process.env.UPLOAD_ALLOWED_EXTENSIONS || '.jpg,
   .map(ext => ext.trim().toLowerCase())
   .filter(Boolean);
 
+const trustProxy = process.env.TRUST_PROXY || 'loopback';
+
 const requiredEnv = ['JWT_SECRET', 'DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
 const missingEnv = requiredEnv.filter(key => !process.env[key]);
 if (missingEnv.length > 0) {
@@ -85,6 +87,21 @@ module.exports = {
     recallWindowSeconds: Number(process.env.MESSAGE_RECALL_WINDOW_SECONDS || 120)
   },
 
+  // 敏感内容审核配置
+  contentModeration: {
+    ai: {
+      endpoint: process.env.CONTENT_MODERATION_AI_ENDPOINT || '',
+      key: process.env.CONTENT_MODERATION_AI_KEY || '',
+      model: process.env.CONTENT_MODERATION_AI_MODEL || ''
+    },
+    externalFilter: {
+      endpoint: process.env.CONTENT_MODERATION_EXTERNAL_API_ENDPOINT || '',
+      token: process.env.CONTENT_MODERATION_EXTERNAL_API_TOKEN || ''
+    },
+    timeoutMs: Number(process.env.CONTENT_MODERATION_TIMEOUT_MS || 5000),
+    blockedText: process.env.CONTENT_MODERATION_BLOCKED_TEXT || '该内容已被屏蔽'
+  },
+
   // Socket配置
   socket: {
     pingInterval: 25000,
@@ -102,6 +119,7 @@ module.exports = {
   // 服务器配置
   server: {
     port: process.env.PORT || 3004,
+    trustProxy,
     cors: {
       origin: corsOrigins,
       credentials: true

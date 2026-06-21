@@ -84,6 +84,11 @@ export const useSocketStore = defineStore('socket', () => {
       chatStore.handleMessageRecalled(data.messageId);
     });
     
+    // 审核更新后的消息
+    s.on('message_updated', (data) => {
+      chatStore.handleMessageUpdated(data.message || data);
+    });
+
     // 用户状态变更
     s.on('user_status_change', (data) => {
       if (data.online) {
