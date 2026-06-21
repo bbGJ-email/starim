@@ -20,6 +20,11 @@ async function ensurePublicAccountTables(pool) {
       isBlocked BOOLEAN DEFAULT false
     )
   `);
+  await safeAddColumn(pool, 'st_public_accounts', 'description', 'TEXT');
+  await safeAddColumn(pool, 'st_public_accounts', 'avatar', 'VARCHAR(255)');
+  await safeAddColumn(pool, 'st_public_accounts', 'ownerId', 'VARCHAR(36)');
+  await safeAddColumn(pool, 'st_public_accounts', 'followers', 'JSON');
+  await safeAddColumn(pool, 'st_public_accounts', 'createdAt', 'DATETIME');
   await safeAddColumn(pool, 'st_public_accounts', 'moderationStatus', "VARCHAR(20) DEFAULT 'pending'");
   await safeAddColumn(pool, 'st_public_accounts', 'isBlocked', 'BOOLEAN DEFAULT false');
 }
@@ -161,18 +166,27 @@ router.post('/public-account/register', authenticateToken, async (req, res) => {
 
     await ensurePublicAccountTables(pool);
 
+    const cleanName = String(name).trim();
+    const cleanDescription = String(description || '').trim();
+    const cleanAvatar = String(avatar || '').trim() || null;
+
+    const [existingRows] = await pool.execute('SELECT id FROM st_public_accounts WHERE name = ? LIMIT 1', [cleanName]);
+    if (existingRows[0]) {
+      return res.json({ ok: false, msg: '公众号名称已存在' });
+    }
+
     const id = generateId();
     const createdAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await pool.execute(
       'INSERT INTO st_public_accounts (id, name, description, avatar, ownerId, followers, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, name, description || '', avatar || null, req.user.id, '[]', createdAt]
+      [id, cleanName, cleanDescription, cleanAvatar, req.user.id, '[]', createdAt]
     );
 
     const [rows] = await pool.execute('SELECT * FROM st_public_accounts WHERE id = ? LIMIT 1', [id]);
     enqueuePublicAccountModeration({
       accountId: id,
-      name,
-      description: description || '',
+      name: cleanName,
+      description: cleanDescription,
       ownerId: req.user.id
     });
     res.json({ ok: true, msg: '公众号注册成功', data: toPublicAccount(rows[0], req.user.id), id });

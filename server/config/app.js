@@ -99,7 +99,7 @@ module.exports = {
       token: process.env.CONTENT_MODERATION_EXTERNAL_API_TOKEN || ''
     },
     timeoutMs: Number(process.env.CONTENT_MODERATION_TIMEOUT_MS || 5000),
-    blockedText: process.env.CONTENT_MODERATION_BLOCKED_TEXT || '该内容已被屏蔽'
+    blockedText: process.env.CONTENT_MODERATION_BLOCKED_TEXT || '检测到敏感内容，已自动屏蔽'
   },
 
   // Socket配置

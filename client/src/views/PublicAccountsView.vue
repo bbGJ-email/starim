@@ -184,7 +184,11 @@ async function registerAccount() {
   }
   actionLoading.value = true;
   try {
-    const res = await publicAccountApi.register(registerForm.value);
+    const res = await publicAccountApi.register({
+      name: registerForm.value.name.trim(),
+      avatar: registerForm.value.avatar.trim(),
+      description: registerForm.value.description.trim()
+    });
     if (res.ok) {
       toastStore.success('公众号注册成功');
       showRegister.value = false;
@@ -193,6 +197,8 @@ async function registerAccount() {
     } else {
       toastStore.error(res.msg || '注册失败');
     }
+  } catch (error) {
+    toastStore.error(error?.response?.data?.msg || error?.message || '注册失败');
   } finally {
     actionLoading.value = false;
   }
@@ -445,6 +451,72 @@ onMounted(async () => {
   label {
     color: var(--text-secondary);
     font-weight: 500;
+  }
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(70, 58, 48, 0.34);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.modal-content {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border: 1px solid rgba(255, 252, 247, 0.72);
+  border-radius: 28px;
+  background: rgba(255, 252, 247, 0.96);
+  box-shadow: var(--shadow-xl);
+}
+
+.modal-header,
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--border-light);
+
+  h3 {
+    margin: 0;
+    color: var(--text-primary);
+  }
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-light);
+}
+
+.close-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+
+  &:hover {
+    background: var(--danger-light);
+    color: var(--danger);
   }
 }
 
